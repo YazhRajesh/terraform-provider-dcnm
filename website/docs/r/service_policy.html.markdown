@@ -24,6 +24,16 @@ resource "dcnm_service_policy" "example" {
   dest_vrf_name            = "dev_vrf_one"
   next_hop_ip              = "10.10.10.2"
   peering_name             = "RP-1"
+  policy_template_name     = "service_pbr"
+  reverse_enabled          = false
+  protocol                 = "ip"
+  src_port                 = "any"
+  dest_port                = "any"
+  route_map_action         = "permit"
+  next_hop_action          = "none"
+  fwd_direction            = true
+  deploy                   = false
+  deploy_timeout           = 300
   service_node_name        = "SN-1"
   source_network           = "dev_network_one"
   source_vrf_name          = "dev_vrf_one"
