@@ -32,8 +32,4 @@ data "dcnm_policy" "example" {
 * `template_name` -  A unique name identifying the template. Please note that a template name can be used by multiple policies and hence a template name does not identify a policy uniquely.
 * `template_props` - Properties of the templates related to template name.
 * `priority` - Priority of the policy.Default value is 500.
-* `source` - The source of the policy.
 * `description`- Description of the policy. The description may include the details regarding the policy.Default value is "".
-* `entity_name`- Name of the entity.i.e."SWITCH".
-* `entity_type`- Type of the entity.i.e."SWITCH".
-* `template_content_type` - (Optional) Content type of the specified template.

@@ -35,19 +35,7 @@ func resourceDCNMPolicy() *schema.Resource {
 				Required: true,
 				ForceNew: true,
 			},
-			"source": &schema.Schema{
-				Type:     schema.TypeString,
-				Optional: true,
-			},
 			"description": &schema.Schema{
-				Type:     schema.TypeString,
-				Optional: true,
-			},
-			"entity_type": &schema.Schema{
-				Type:     schema.TypeString,
-				Optional: true,
-			},
-			"entity_name": &schema.Schema{
 				Type:     schema.TypeString,
 				Optional: true,
 			},
@@ -59,10 +47,6 @@ func resourceDCNMPolicy() *schema.Resource {
 				Type:     schema.TypeString,
 				Required: true,
 				ForceNew: true,
-			},
-			"template_content_type": &schema.Schema{
-				Type:     schema.TypeString,
-				Optional: true,
 			},
 			"template_props": &schema.Schema{
 				Type:     schema.TypeMap,
@@ -129,24 +113,19 @@ func resourceDCNMPolicyCreate(d *schema.ResourceData, m interface{}) error {
 	policy.SerialNumber = serialNumber
 	policy.TemplateName = templateName
 	policy.NVPairs = nvPairMap
-	if source, ok := d.GetOk("source"); ok {
-		policy.Source = source.(string)
-	}
+	policy.Source = ""
+	policy.EntityType = "SWITCH"
+	policy.EntityName = "SWITCH"
+	policy.TemplateContentType = "TEMPLATE_CLI"
+
 	if description, ok := d.GetOk("description"); ok {
 		policy.Description = description.(string)
 	}
-	if entityType, ok := d.GetOk("entity_type"); ok {
-		policy.EntityType = entityType.(string)
-	}
-	if entityName, ok := d.GetOk("entity_name"); ok {
-		policy.EntityName = entityName.(string)
-	}
+
 	if priority, ok := d.GetOk("priority"); ok {
 		policy.Priority = priority.(string)
 	}
-	if templateContentType, ok := d.GetOk("template_content_type"); ok {
-		policy.TemplateContentType = templateContentType.(string)
-	}
+
 	if dcnmClient.GetPlatform() == "nd" {
 		cont, err := dcnmClient.Save("/rest/control/policies", &policy)
 		if err != nil {
@@ -268,30 +247,24 @@ func resourceDCNMPolicyUpdate(d *schema.ResourceData, m interface{}) error {
 	policy.SerialNumber = serialNumber
 	policy.TemplateName = templateName
 	policy.NVPairs = nvPairMap
+	policy.Source = ""
+	policy.EntityType = "SWITCH"
+	policy.EntityName = "SWITCH"
+	policy.TemplateContentType = "TEMPLATE_CLI"
 	if policyId, ok := d.GetOk("policy_id"); ok {
 		policy.PolicyId = policyId.(string)
 
 	} else {
 		policy.PolicyId = "POLICY-" + d.Id()
 	}
-	if source, ok := d.GetOk("source"); ok {
-		policy.Source = source.(string)
-	}
 	if description, ok := d.GetOk("description"); ok {
 		policy.Description = description.(string)
 	}
-	if entityType, ok := d.GetOk("entity_type"); ok {
-		policy.EntityType = entityType.(string)
-	}
-	if entityName, ok := d.GetOk("entity_name"); ok {
-		policy.EntityName = entityName.(string)
-	}
+
 	if priority, ok := d.GetOk("priority"); ok {
 		policy.Priority = priority.(string)
 	}
-	if templateContentType, ok := d.GetOk("template_content_type"); ok {
-		policy.TemplateContentType = templateContentType.(string)
-	}
+
 	policy.Id = d.Id()
 	dUrl := fmt.Sprintf("/rest/control/policies/%s", policy.PolicyId)
 	cont, err := dcnmClient.Update(dUrl, &policy)
