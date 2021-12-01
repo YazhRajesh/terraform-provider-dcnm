@@ -184,7 +184,6 @@ func dataSourceDCNMServiceNodeRead(d *schema.ResourceData, m interface{}) error 
 
 	serviceNodeName := d.Get("name").(string)
 	fabricName := d.Get("service_fabric").(string)
-	attachedFabricName := d.Get("attached_fabric").(string)
 
 	var durl string
 	if dcnmClient.GetPlatform() == "nd" {
@@ -197,6 +196,7 @@ func dataSourceDCNMServiceNodeRead(d *schema.ResourceData, m interface{}) error 
 	if err != nil {
 		return err
 	}
+	attachedFabricName := stripQuotes(cont.S("attachedFabricName").String())
 
 	setServiceNodeAttributes(d, cont)
 	d.Set("source_if_name", stripQuotes(cont.S("nvPairs", "SOURCE_IF_NAME").String()))

@@ -132,3 +132,18 @@ func readFile(filename string) (string, error) {
 	}
 	return string(data), nil
 }
+
+func convertToQuotedStringArray(arr []string) string {
+	resString := "["
+	for i := 0; i < len(arr)-1; i++ {
+		resString = resString + QuotedString(arr[i]) + ","
+	}
+	resString = resString + QuotedString(arr[len(arr)-1])
+	resString = resString + "]"
+	return resString
+}
+
+func QuotedString(str string) string {
+	res := fmt.Sprintf("\"%s\"", str)
+	return res
+}

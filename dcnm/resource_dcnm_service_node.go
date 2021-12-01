@@ -183,6 +183,7 @@ func setServiceNodeAttributes(d *schema.ResourceData, cont *container.Container)
 	serviceNodeName := stripQuotes(cont.S("name").String())
 	fabricName := stripQuotes(cont.S("fabricName").String())
 	attachedFabricName := stripQuotes(cont.S("attachedFabricName").String())
+	nodeType := stripQuotes(cont.S("type").String())
 	d.Set("name", serviceNodeName)
 	d.Set("service_fabric", fabricName)
 	d.Set("node_type", stripQuotes(cont.S("type").String()))
@@ -212,7 +213,7 @@ func setServiceNodeAttributes(d *schema.ResourceData, cont *container.Container)
 	d.Set("porttype_fast_enabled", stripQuotes(cont.S("nvPairs", "PORTTYPE_FAST_ENABLED").String()))
 	d.Set("admin_state", stripQuotes(cont.S("nvPairs", "ADMIN_STATE").String()))
 
-	d.SetId(fmt.Sprintf("%s/%s/%s", fabricName, attachedFabricName, serviceNodeName))
+	d.SetId(fmt.Sprintf("%s/%s/%s/%s", fabricName, attachedFabricName, nodeType, serviceNodeName))
 	return d
 }
 
@@ -287,7 +288,7 @@ func resourceDCNMServiceNodeCreate(d *schema.ResourceData, m interface{}) error 
 		return err
 	}
 
-	d.SetId(fmt.Sprintf("%s/%s/%s", fabricName, attachedFabric, serviceNodeName))
+	d.SetId(fmt.Sprintf("%s/%s/%s/%s", fabricName, attachedFabric, serviceNode.Type, serviceNodeName))
 	log.Println("[DEBUG] End of Create ", d.Id())
 	return resourceDCNMServiceNodeRead(d, m)
 }
@@ -362,7 +363,7 @@ func resourceDCNMServiceNodeUpdate(d *schema.ResourceData, m interface{}) error 
 		return err
 	}
 
-	d.SetId(fmt.Sprintf("%s/%s/%s", fabricName, attachedFabric, serviceNodeName))
+	d.SetId(fmt.Sprintf("%s/%s/%s/%s", fabricName, attachedFabric, serviceNode.Type, serviceNodeName))
 	log.Println("[DEBUG] End of Update ", d.Id())
 	return resourceDCNMServiceNodeRead(d, m)
 }
@@ -391,7 +392,7 @@ func resourceDCNMServiceNodeDelete(d *schema.ResourceData, m interface{}) error 
 	dcnmClient := m.(*client.Client)
 	idList := strings.Split(d.Id(), "/")
 	fabricName := idList[0]
-	serviceNodeName := idList[2]
+	serviceNodeName := idList[3]
 
 	var durl string
 	if dcnmClient.GetPlatform() == "nd" {

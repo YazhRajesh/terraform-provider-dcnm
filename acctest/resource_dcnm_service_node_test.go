@@ -2,817 +2,444 @@ package acctest
 
 import (
 	"fmt"
-	"log"
 	"regexp"
+	"strings"
 	"testing"
 
 	"github.com/ciscoecosystem/dcnm-go-client/client"
-	"github.com/ciscoecosystem/dcnm-go-client/models"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/acctest"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/terraform"
 )
 
-var providerServicePolicy *schema.Provider
+var providerServiceNode *schema.Provider
+var listParams = []string{"switches"}
+
+const serviceFabricName = "external"
+const attachedFabricName = "terraform"
+const attachedSwitchInterfaceName = "Ethernet1/9"
+const interfaceName = "node"
+const sw1 = "9LMU8W6W8VG"
+const sw2 = "9CIWTMB13GP"
+const sw3 = "9FTD5XQKR46"
+const nodeTypeDefault = "Firewall"
 
 func TestAccDCNMServiceNode_Basic(t *testing.T) {
 	var serviceNodeDefaultId string
 	var serviceNodeUpdatedId string
-	resourceName := "dcnm_service_node.first"
+	swtiches := []string{sw1}
+	resourceName := "dcnm_service_node.test"
 	rName := acctest.RandString(5)
-	nodeTypeInd:=acctest.RandStringFromCharSet(1,"012")
+	rNameOther := acctest.RandString(5)
+	var nodeTypeValues [3]string
+	nodeTypeValues[0] = "Firewall"
+	nodeTypeValues[1] = "ADC"
+	nodeTypeValues[2] = "VNF"
+	m := make(map[string]interface{})
+	m["name"] = rName
+	m["node_type"] = nodeTypeValues[0]
+	m["service_fabric"] = serviceFabricName
+	m["attached_fabric"] = attachedFabricName
+	m["attached_switch_interface_name"] = attachedSwitchInterfaceName
+	m["interface_name"] = interfaceName
+	m["switches"] = swtiches
+	optmap := make(map[string]interface{})
+	optmap["name"] = rName
+	optmap["node_type"] = nodeTypeValues[0]
+	optmap["service_fabric"] = serviceFabricName
+	optmap["attached_fabric"] = attachedFabricName
+	optmap["attached_switch_interface_name"] = attachedSwitchInterfaceName
+	optmap["interface_name"] = interfaceName
+	optmap["switches"] = swtiches
+	optmap["form_factor"] = "Physical"
+	optmap["bpdu_guard_flag"] = "true"
+	optmap["porttype_fast_enabled"] = "false"
+	optmap["admin_state"] = "false"
+	optmap["policy_description"] = "sample_policy_description"
+	optmap["mtu"] = "default"
+	optmap["speed"] = "10Mb"
+	optmap["allowed_vlans"] = "all"
 	resource.Test(t, resource.TestCase{
 		PreCheck:          func() { testAccPreCheck(t) },
-		ProviderFactories: testAccProviderFactoriesInternal(&providerServicePolicy),
-		// CheckDestroy:      testAccCheckDCNMPolicyDestroy,
+		ProviderFactories: testAccProviderFactoriesInternal(&providerServiceNode),
+		CheckDestroy:      testAccCheckDCNMServiceNodeDestroy,
 		Steps: []resource.TestStep{
 			{
-				// terraform will try to create service policy without required argument policy_name
-				Config:      CreateAccServicePolicyWithoutPolicy_name(rName, ip), // configuration to check creation of service policy without policy_name
-				ExpectError: regexp.MustCompile(`Missing required argument`),     // test step expect error which should be match with defined regex
-			},
-			{
-				// terraform will try to create service policy without required argument service_fabric
-				Config:      CreateAccServicePolicyWithoutService_fabric(rName, ip), // configuration to check creation of service policy without service_fabric
+				Config:      CreateServiceNode([]string{"name"}, m, listParams),
 				ExpectError: regexp.MustCompile(`Missing required argument`),
 			},
 			{
-				// terraform will try to create service policy without required argument attached_fabric
-				Config:      CreateAccServicePolicyWithoutAttached_fabric(rName, ip), // configuration to check creation of service policy without attached_fabric
+				Config:      CreateServiceNode([]string{"node_type"}, m, listParams),
 				ExpectError: regexp.MustCompile(`Missing required argument`),
 			},
 			{
-				// terraform will try to create service policy without required argument dest_network
-				Config:      CreateAccServicePolicyWithoutDest_network(rName, ip), // configuration to check creation of service policy without dest_network
+				Config:      CreateServiceNode([]string{"service_fabric"}, m, listParams),
 				ExpectError: regexp.MustCompile(`Missing required argument`),
 			},
 			{
-				// terraform will try to create service policy without required argument dest_vrf_name
-				Config:      CreateAccServicePolicyWithoutDest_vrf_name(rName, ip), // configuration to check creation of service policy without dest_vrf_name
+				Config:      CreateServiceNode([]string{"attached_fabric"}, m, listParams),
 				ExpectError: regexp.MustCompile(`Missing required argument`),
 			},
 			{
-				// terraform will try to create service policy without required argument next_hop_ip
-				Config:      CreateAccServicePolicyWithoutNext_hop_ip(rName), // configuration to check creation of service policy without next_hop_ip
+				Config:      CreateServiceNode([]string{"attached_switch_interface_name"}, m, listParams),
 				ExpectError: regexp.MustCompile(`Missing required argument`),
 			},
 			{
-				// terraform will try to create service policy without required argument peering_name
-				Config:      CreateAccServicePolicyWithoutPeering_name(rName, ip), // configuration to check creation of service policy without peering_name
+				Config:      CreateServiceNode([]string{"interface_name"}, m, listParams),
 				ExpectError: regexp.MustCompile(`Missing required argument`),
 			},
 			{
-				// terraform will try to create service policy without required argument service_node_name
-				Config:      CreateAccServicePolicyWithoutService_node_name(rName, ip), // configuration to check creation of service policy without service_node_name
+				Config:      CreateServiceNode([]string{"switches"}, m, listParams),
 				ExpectError: regexp.MustCompile(`Missing required argument`),
 			},
 			{
-				// terraform will try to create service policy without required argument source_network
-				Config:      CreateAccServicePolicyWithoutSource_network(rName, ip), // configuration to check creation of service policy without source_network
-				ExpectError: regexp.MustCompile(`Missing required argument`),
-			},
-			{
-				// terraform will try to create service policy without required argument source_vrf_name
-				Config:      CreateAccServicePolicyWithoutSource_vrf_name(rName, ip), // configuration to check creation of service policy without source_vrf_name
-				ExpectError: regexp.MustCompile(`Missing required argument`),
-			},
-			{
-				Config: CreateAccServicePolicyConfig(rName, ip), // configuration to create ServicePolicy with required fields only
+				Config: CreateServiceNode([]string{}, m, listParams),
 				Check: resource.ComposeTestCheckFunc(
-					testAccCheckDCNMServicePolicyExists(resourceName, &servicePolicy_default), // this function will check whether any resource is exist or not in state file with given resource name
-					// now will compare value of all attributes with default value for given resource
-					resource.TestCheckResourceAttr(resourceName, "policy_template_name", "service_pbr"),
-					resource.TestCheckResourceAttr(resourceName, "reverse_enabled", "false"),
-					resource.TestCheckResourceAttr(resourceName, "protocol", "ip"),
-					resource.TestCheckResourceAttr(resourceName, "src_port", "any"),
-					resource.TestCheckResourceAttr(resourceName, "dest_port", "any"),
-					resource.TestCheckResourceAttr(resourceName, "route_map_action", "permit"),
-					resource.TestCheckResourceAttr(resourceName, "next_hop_action", "none"),
-					resource.TestCheckResourceAttr(resourceName, "fwd_direction", "true"),
-					resource.TestCheckResourceAttr(resourceName, "deploy", "false"),
-					resource.TestCheckResourceAttr(resourceName, "deploy_timeout", "300"),
+					testAccCheckDCNMServiceNodeExists(resourceName, serviceFabricName, attachedFabricName, nodeTypeValues[0], rName, &serviceNodeDefaultId),
+					resource.TestCheckResourceAttr(resourceName, "admin_state", "true"),
+					resource.TestCheckResourceAttr(resourceName, "allowed_vlans", "none"),
+					resource.TestCheckResourceAttr(resourceName, "bpdu_guard_flag", "no"),
+					resource.TestCheckResourceAttr(resourceName, "form_factor", "Virtual"),
+					resource.TestCheckResourceAttr(resourceName, "link_template_name", "service_link_trunk"),
+					resource.TestCheckResourceAttr(resourceName, "mtu", "jumbo"),
+					resource.TestCheckResourceAttr(resourceName, "porttype_fast_enabled", "true"),
+					resource.TestCheckResourceAttr(resourceName, "speed", "Auto"),
 				),
 			},
 			{
-				// this step will import state of particular resource and will test state file with configuration file
-				ResourceName:      resourceName,
-				ImportState:       true,
-				ImportStateVerify: true,
-			},
-			{
-				// in this step all optional attribute are given for the same resource and then compared
-				Config: CreateAccServicePolicyConfigWithOptionalValues(rName, ip), // configuration to update optional filelds
+
+				Config: CreateServiceNode([]string{}, optmap, listParams),
 				Check: resource.ComposeTestCheckFunc(
-					testAccCheckDCNMServicePolicyExists(resourceName, &servicePolicy_updated),
-					// now will compare value of all optional attributes with updated values from configuration
-					resource.TestCheckResourceAttr(resourceName, "policy_template_name", "service_template"),
-					resource.TestCheckResourceAttr(resourceName, "reverse_enabled", "true"),
-					resource.TestCheckResourceAttr(resourceName, "protocol", "tcp"),
-					resource.TestCheckResourceAttr(resourceName, "src_port", "3200"),
-					resource.TestCheckResourceAttr(resourceName, "dest_port", "3300"),
-					resource.TestCheckResourceAttr(resourceName, "route_map_action", "deny"),
-					resource.TestCheckResourceAttr(resourceName, "next_hop_action", "drop"),
-					resource.TestCheckResourceAttr(resourceName, "fwd_direction", "false"),
-					resource.TestCheckResourceAttr(resourceName, "deploy", "false"),
-					resource.TestCheckResourceAttr(resourceName, "deploy_timeout", "200"),
-					testAccCheckDCNMServicePolicyIdEqual(resourceName, &servicePolicy_default, &servicePolicy_updated), // this function will check whether id or dn of both resource are same or not to make sure updation is performed on the same resource
+					testAccCheckDCNMServiceNodeExists(resourceName, serviceFabricName, attachedFabricName, nodeTypeValues[0], rName, &serviceNodeUpdatedId),
+					resource.TestCheckResourceAttr(resourceName, "form_factor", "Physical"),
+					resource.TestCheckResourceAttr(resourceName, "bpdu_guard_flag", "true"),
+					resource.TestCheckResourceAttr(resourceName, "porttype_fast_enabled", "false"),
+					resource.TestCheckResourceAttr(resourceName, "admin_state", "false"),
+					resource.TestCheckResourceAttr(resourceName, "policy_description", "sample_policy_description"),
+					resource.TestCheckResourceAttr(resourceName, "mtu", "default"),
+					resource.TestCheckResourceAttr(resourceName, "speed", "10Mb"),
+					resource.TestCheckResourceAttr(resourceName, "allowed_vlans", "all"),
+					testAccCheckDCNMServiceNodeIdEqual(&serviceNodeDefaultId, &serviceNodeUpdatedId),
 				),
 			},
 			{
-				ResourceName:      resourceName,
-				ImportState:       true,
-				ImportStateVerify: true,
+				ResourceName:            resourceName,
+				ImportState:             true,
+				ImportStateVerify:       true,
+				ImportStateVerifyIgnore: []string{"policy_description"},
+				ImportStateIdFunc:       testServiceNodeImportStateIdFunc(resourceName),
 			},
 			{
-				Config:      CreateAccServicePolicyWithInavalidIP(rName, ip),
-				ExpectError: regexp.MustCompile(`unknown property value`),
-			},
-			{
-				Config:      CreateAccServicePolicyConfigUpdatedName(rName, ip, longerName), // passing invalid name for service policy
-				ExpectError: regexp.MustCompile(fmt.Sprintf("property policy_name of sp-%s failed validation for value '%s'", longerName, longerName)),
-			},
-			{
-				Config: CreateAccServicePolicyWithPolicyIPConfig(rName, rOtherName, ip),
+				Config: CreateServiceNodeByReplacingValueOfKey(m, "name", rNameOther, listParams),
 				Check: resource.ComposeTestCheckFunc(
-					testAccCheckDCNMServicePolicyExists(resourceName, &servicePolicy_updated),
-					resource.TestCheckResourceAttr(resourceName, "policy_name", rOtherName),
-					testAccCheckDCNMServicePolicyIdNotEqual(resourceName, &servicePolicy_default, &servicePolicy_updated), // checking whether id or dn of both resource are different because policyname changed and terraform need to create another resource
+					testAccCheckDCNMServiceNodeExists(resourceName, serviceFabricName, attachedFabricName, nodeTypeValues[0], rNameOther, &serviceNodeUpdatedId),
+					resource.TestCheckResourceAttr(resourceName, "name", rNameOther),
+					testAccCheckDCNMServiceNodeIdNotEqual(&serviceNodeDefaultId, &serviceNodeUpdatedId),
 				),
 			},
 			{
-				ResourceName:      resourceName,
-				ImportState:       true,
-				ImportStateVerify: true,
-			},
-			{
-				Config: CreateAccServicePolicyConfig(rName, ip),
-			},
-			{
-				ResourceName:      resourceName,
-				ImportState:       true,
-				ImportStateVerify: true,
-			},
-			{
-				Config: CreateAccServicePolicyWithServicefabricIPConfig(rName, rOtherName, ip),
+				Config: CreateServiceNode([]string{}, m, listParams),
 				Check: resource.ComposeTestCheckFunc(
-					testAccCheckDCNMServicePolicyExists(resourceName, &servicePolicy_updated),
-					resource.TestCheckResourceAttr(resourceName, "service_fabric", rOtherName),
-					testAccCheckDCNMServicePolicyIdNotEqual(resourceName, &servicePolicy_default, &servicePolicy_updated), // checking whether id or dn of both resource are different because policyname changed and terraform need to create another resource
+					testAccCheckDCNMServiceNodeExists(resourceName, serviceFabricName, attachedFabricName, nodeTypeValues[0], rName, &serviceNodeDefaultId),
 				),
 			},
 			{
-				ResourceName:      resourceName,
-				ImportState:       true,
-				ImportStateVerify: true,
-			},
-			{
-				Config: CreateAccServicePolicyConfig(rName, ip),
-			},
-			{
-				ResourceName:      resourceName,
-				ImportState:       true,
-				ImportStateVerify: true,
-			},
-			{
-				Config: CreateAccServicePolicyWithAttachedfabricIPConfig(rName, rOtherName, ip),
+				Config: CreateServiceNodeByReplacingValueOfKey(m, "node_type", nodeTypeValues[1], listParams),
 				Check: resource.ComposeTestCheckFunc(
-					testAccCheckDCNMServicePolicyExists(resourceName, &servicePolicy_updated),
-					resource.TestCheckResourceAttr(resourceName, "attached_fabric", rOtherName),
-					testAccCheckDCNMServicePolicyIdNotEqual(resourceName, &servicePolicy_default, &servicePolicy_updated), // checking whether id or dn of both resource are different because policyname changed and terraform need to create another resource
+					testAccCheckDCNMServiceNodeExists(resourceName, serviceFabricName, attachedFabricName, nodeTypeValues[1], rName, &serviceNodeUpdatedId),
+					resource.TestCheckResourceAttr(resourceName, "node_type", nodeTypeValues[1]),
+					testAccCheckDCNMServiceNodeIdNotEqual(&serviceNodeDefaultId, &serviceNodeUpdatedId),
 				),
 			},
 			{
-				ResourceName:      resourceName,
-				ImportState:       true,
-				ImportStateVerify: true,
-			},
-			{
-				Config: CreateAccServicePolicyConfig(rName, ip),
-			},
-			{
-				ResourceName:      resourceName,
-				ImportState:       true,
-				ImportStateVerify: true,
-			},
-			{
-				Config: CreateAccServicePolicyWithDestnetworkIPConfig(rName, rOtherName, ip),
+				Config: CreateServiceNode([]string{}, m, listParams),
 				Check: resource.ComposeTestCheckFunc(
-					testAccCheckDCNMServicePolicyExists(resourceName, &servicePolicy_updated),
-					resource.TestCheckResourceAttr(resourceName, "dest_network", rOtherName),
-					testAccCheckDCNMServicePolicyIdNotEqual(resourceName, &servicePolicy_default, &servicePolicy_updated), // checking whether id or dn of both resource are different because policyname changed and terraform need to create another resource
+					testAccCheckDCNMServiceNodeExists(resourceName, serviceFabricName, attachedFabricName, nodeTypeValues[0], rName, &serviceNodeDefaultId),
 				),
 			},
 			{
-				ResourceName:      resourceName,
-				ImportState:       true,
-				ImportStateVerify: true,
-			},
-			{
-				Config: CreateAccServicePolicyConfig(rName, ip),
-			},
-			{
-				ResourceName:      resourceName,
-				ImportState:       true,
-				ImportStateVerify: true,
-			},
-			{
-				Config: CreateAccServicePolicyWithDest_vrf_nameIPConfig(rName, rOtherName, ip),
+				Config: CreateServiceNodeByReplacingValueOfKey(m, "node_type", nodeTypeValues[2], listParams),
 				Check: resource.ComposeTestCheckFunc(
-					testAccCheckDCNMServicePolicyExists(resourceName, &servicePolicy_updated),
-					resource.TestCheckResourceAttr(resourceName, "dest_vrf_name", rOtherName),
-					testAccCheckDCNMServicePolicyIdNotEqual(resourceName, &servicePolicy_default, &servicePolicy_updated), // checking whether id or dn of both resource are different because policyname changed and terraform need to create another resource
-				),
-			},
-			{
-				ResourceName:      resourceName,
-				ImportState:       true,
-				ImportStateVerify: true,
-			},
-			{
-				Config: CreateAccServicePolicyConfig(rName, ip),
-			},
-			{
-				ResourceName:      resourceName,
-				ImportState:       true,
-				ImportStateVerify: true,
-			},
-			{
-				Config: CreateAccServicePolicyWithPeeringnameIPConfig(rName, rOtherName, ip),
-				Check: resource.ComposeTestCheckFunc(
-					testAccCheckDCNMServicePolicyExists(resourceName, &servicePolicy_updated),
-					resource.TestCheckResourceAttr(resourceName, "peering_name", rOtherName),
-					testAccCheckDCNMServicePolicyIdNotEqual(resourceName, &servicePolicy_default, &servicePolicy_updated), // checking whether id or dn of both resource are different because policyname changed and terraform need to create another resource
-				),
-			},
-			{
-				ResourceName:      resourceName,
-				ImportState:       true,
-				ImportStateVerify: true,
-			},
-			{
-				Config: CreateAccServicePolicyConfig(rName, ip),
-			},
-			{
-				ResourceName:      resourceName,
-				ImportState:       true,
-				ImportStateVerify: true,
-			},
-			{
-				Config: CreateAccServicePolicyWithServicenodenameIPConfig(rName, rOtherName, ip),
-				Check: resource.ComposeTestCheckFunc(
-					testAccCheckDCNMServicePolicyExists(resourceName, &servicePolicy_updated),
-					resource.TestCheckResourceAttr(resourceName, "service_node_name", rOtherName),
-					testAccCheckDCNMServicePolicyIdNotEqual(resourceName, &servicePolicy_default, &servicePolicy_updated), // checking whether id or dn of both resource are different because policyname changed and terraform need to create another resource
-				),
-			},
-			{
-				ResourceName:      resourceName,
-				ImportState:       true,
-				ImportStateVerify: true,
-			},
-			{
-				Config: CreateAccServicePolicyConfig(rName, ip),
-			},
-			{
-				ResourceName:      resourceName,
-				ImportState:       true,
-				ImportStateVerify: true,
-			},
-			{
-				Config: CreateAccServicePolicyWithSource_networkIPConfig(rName, rOtherName, ip),
-				Check: resource.ComposeTestCheckFunc(
-					testAccCheckDCNMServicePolicyExists(resourceName, &servicePolicy_updated),
-					resource.TestCheckResourceAttr(resourceName, "source_network", rOtherName),
-					testAccCheckDCNMServicePolicyIdNotEqual(resourceName, &servicePolicy_default, &servicePolicy_updated), // checking whether id or dn of both resource are different because policyname changed and terraform need to create another resource
-				),
-			},
-			{
-				ResourceName:      resourceName,
-				ImportState:       true,
-				ImportStateVerify: true,
-			},
-			{
-				Config: CreateAccServicePolicyConfig(rName, ip),
-			},
-			{
-				ResourceName:      resourceName,
-				ImportState:       true,
-				ImportStateVerify: true,
-			},
-			{
-				Config: CreateAccServicePolicyWithSource_vrf_nameIPConfig(rName, rOtherName, ip),
-				Check: resource.ComposeTestCheckFunc(
-					testAccCheckDCNMServicePolicyExists(resourceName, &servicePolicy_updated),
-					resource.TestCheckResourceAttr(resourceName, "source_vrf_name", rOtherName),
-					testAccCheckDCNMServicePolicyIdNotEqual(resourceName, &servicePolicy_default, &servicePolicy_updated), // checking whether id or dn of both resource are different because policyname changed and terraform need to create another resource
+					testAccCheckDCNMServiceNodeExists(resourceName, serviceFabricName, attachedFabricName, nodeTypeValues[2], rName, &serviceNodeUpdatedId),
+					resource.TestCheckResourceAttr(resourceName, "node_type", nodeTypeValues[2]),
+					testAccCheckDCNMServiceNodeIdNotEqual(&serviceNodeDefaultId, &serviceNodeUpdatedId),
 				),
 			},
 		},
 	})
 }
 
-func TestAccDCNMPolicy_Update(t *testing.T) {
-	var servicePolicy_default models.ServicePolicy
-	var servicePolicy_updated models.ServicePolicy
-	resourceName := "dcnm_service_policy.first"
+func TestAccDCNMServiceNode_Update(t *testing.T) {
 	rName := acctest.RandString(5)
-	//rOtherName := acctest.RandString(5)
-	ip, _ := acctest.RandIpAddress("10.20.0.0/16")
-	ip = fmt.Sprintf("%s/16", ip)
+	resourceName := "dcnm_service_node.test"
+	var serviceNodeDefaultId string
+	var serviceNodeUpdatedId string
+	switches := []string{sw1}
+	m := make(map[string]interface{})
+	m["name"] = rName
+	m["node_type"] = "Firewall"
+	m["service_fabric"] = serviceFabricName
+	m["attached_fabric"] = attachedFabricName
+	m["attached_switch_interface_name"] = attachedSwitchInterfaceName
+	m["interface_name"] = interfaceName
+	m["switches"] = switches
 	resource.Test(t, resource.TestCase{
 		PreCheck:          func() { testAccPreCheck(t) },
-		ProviderFactories: testAccProviderFactoriesInternal(&providerServicePolicy),
-		// CheckDestroy:      testAccCheckDCNMPolicyDestroy,
+		ProviderFactories: testAccProviderFactoriesInternal(&providerServiceNode),
+		CheckDestroy:      testAccCheckDCNMServiceNodeDestroy,
 		Steps: []resource.TestStep{
 			{
-				Config: CreateAccServicePolicyConfig(rName, ip), // configuration to create ServicePolicy with required fields only
-				Check: resource.ComposeTestCheckFunc(
-					testAccCheckDCNMServicePolicyExists(resourceName, &servicePolicy_default), // this function will check whether any resource is exist or not in state file with given resource name
+				Config: CreateServiceNode([]string{}, m, listParams),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					testAccCheckDCNMServiceNodeExists(resourceName, serviceFabricName, attachedFabricName, "Firewall", rName, &serviceNodeDefaultId),
 				),
 			},
 			{
-				// this step will import state of particular resource and will test state file with configuration file
-				ResourceName:      resourceName,
-				ImportState:       true,
-				ImportStateVerify: true,
-			},
-			{
-				Config: CreateAccServicePolicyUpdatedAttr(rName, ip, "policy_template_name", "updated policy_template_name for terraform test"), // updating only policy_template_name parameter
-				Check: resource.ComposeTestCheckFunc(
-					testAccCheckDCNMServicePolicyExists(resourceName, &servicePolicy_updated),                                               // checking whether resource is exist or not in state file
-					resource.TestCheckResourceAttr(resourceName, "policy_template_name", "updated policy_template_name for terraform test"), // checking value updated value of description parameter
-					testAccCheckDCNMServicePolicyIdEqual(resourceName, &servicePolicy_default, &servicePolicy_updated),                      // this function will check whether id or dn of both resource are same or not to make sure updation is performed on the same resource
+				Config: CreateServiceNodeByAddingParamAndValue(rName, "speed", "100Mb"),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					testAccCheckDCNMServiceNodeExists(resourceName, serviceFabricName, attachedFabricName, "Firewall", rName, &serviceNodeUpdatedId),
+					resource.TestCheckResourceAttr(resourceName, "speed", "100Mb"),
+					testAccCheckDCNMServiceNodeIdEqual(&serviceNodeDefaultId, &serviceNodeUpdatedId),
 				),
 			},
 			{
-				ResourceName:      resourceName,
-				ImportState:       true,
-				ImportStateVerify: true,
-			},
-			{
-				Config: CreateAccServicePolicyUpdatedAttr(rName, ip, "reverse_enabled", "true"), // updating only reverse_enabled parameter
-				Check: resource.ComposeTestCheckFunc(
-					testAccCheckDCNMServicePolicyExists(resourceName, &servicePolicy_updated),                          // checking whether resource is exist or not in state file
-					resource.TestCheckResourceAttr(resourceName, "reverse_enabled", "true"),                            // checking value updated value of description parameter
-					testAccCheckDCNMServicePolicyIdEqual(resourceName, &servicePolicy_default, &servicePolicy_updated), // this function will check whether id or dn of both resource are same or not to make sure updation is performed on the same resource
+				Config: CreateServiceNodeByAddingParamAndValue(rName, "speed", "1Gb"),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					testAccCheckDCNMServiceNodeExists(resourceName, serviceFabricName, attachedFabricName, "Firewall", rName, &serviceNodeUpdatedId),
+					resource.TestCheckResourceAttr(resourceName, "speed", "1Gb"),
+					testAccCheckDCNMServiceNodeIdEqual(&serviceNodeDefaultId, &serviceNodeUpdatedId),
 				),
 			},
 			{
-				ResourceName:      resourceName,
-				ImportState:       true,
-				ImportStateVerify: true,
-			},
-			{
-				Config: CreateAccServicePolicyUpdatedAttr(rName, ip, "protocol", "tcp"), // updating only protocol parameter
-				Check: resource.ComposeTestCheckFunc(
-					testAccCheckDCNMServicePolicyExists(resourceName, &servicePolicy_updated),                          // checking whether resource is exist or not in state file
-					resource.TestCheckResourceAttr(resourceName, "protocol", "tcp"),                                    // checking value updated value of description parameter
-					testAccCheckDCNMServicePolicyIdEqual(resourceName, &servicePolicy_default, &servicePolicy_updated), // this function will check whether id or dn of both resource are same or not to make sure updation is performed on the same resource
+				Config: CreateServiceNodeByAddingParamAndValue(rName, "speed", "2.5Gb"),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					testAccCheckDCNMServiceNodeExists(resourceName, serviceFabricName, attachedFabricName, "Firewall", rName, &serviceNodeUpdatedId),
+					resource.TestCheckResourceAttr(resourceName, "speed", "2.5Gb"),
+					testAccCheckDCNMServiceNodeIdEqual(&serviceNodeDefaultId, &serviceNodeUpdatedId),
 				),
 			},
 			{
-				ResourceName:      resourceName,
-				ImportState:       true,
-				ImportStateVerify: true,
-			},
-			{
-				Config: CreateAccServicePolicyUpdatedAttr(rName, ip, "src_port", "2800"), // updating only src_port parameter
-				Check: resource.ComposeTestCheckFunc(
-					testAccCheckDCNMServicePolicyExists(resourceName, &servicePolicy_updated),                          // checking whether resource is exist or not in state file
-					resource.TestCheckResourceAttr(resourceName, "src_port", "2800"),                                   // checking value updated value of description parameter
-					testAccCheckDCNMServicePolicyIdEqual(resourceName, &servicePolicy_default, &servicePolicy_updated), // this function will check whether id or dn of both resource are same or not to make sure updation is performed on the same resource
+				Config: CreateServiceNodeByAddingParamAndValue(rName, "speed", "5Gb"),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					testAccCheckDCNMServiceNodeExists(resourceName, serviceFabricName, attachedFabricName, "Firewall", rName, &serviceNodeUpdatedId),
+					resource.TestCheckResourceAttr(resourceName, "speed", "5Gb"),
+					testAccCheckDCNMServiceNodeIdEqual(&serviceNodeDefaultId, &serviceNodeUpdatedId),
 				),
 			},
 			{
-				ResourceName:      resourceName,
-				ImportState:       true,
-				ImportStateVerify: true,
-			},
-			{
-				Config: CreateAccServicePolicyUpdatedAttr(rName, ip, "dest_port", "3800"), // updating only dest_port parameter
-				Check: resource.ComposeTestCheckFunc(
-					testAccCheckDCNMServicePolicyExists(resourceName, &servicePolicy_updated),                          // checking whether resource is exist or not in state file
-					resource.TestCheckResourceAttr(resourceName, "dest_port", "3800"),                                  // checking value updated value of description parameter
-					testAccCheckDCNMServicePolicyIdEqual(resourceName, &servicePolicy_default, &servicePolicy_updated), // this function will check whether id or dn of both resource are same or not to make sure updation is performed on the same resource
+				Config: CreateServiceNodeByAddingParamAndValue(rName, "speed", "10Gb"),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					testAccCheckDCNMServiceNodeExists(resourceName, serviceFabricName, attachedFabricName, "Firewall", rName, &serviceNodeUpdatedId),
+					resource.TestCheckResourceAttr(resourceName, "speed", "10Gb"),
+					testAccCheckDCNMServiceNodeIdEqual(&serviceNodeDefaultId, &serviceNodeUpdatedId),
 				),
 			},
 			{
-				ResourceName:      resourceName,
-				ImportState:       true,
-				ImportStateVerify: true,
-			},
-			{
-				Config: CreateAccServicePolicyUpdatedAttr(rName, ip, "route_map_action", "permit"), // updating only route_map_action parameter
-				Check: resource.ComposeTestCheckFunc(
-					testAccCheckDCNMServicePolicyExists(resourceName, &servicePolicy_updated),                          // checking whether resource is exist or not in state file
-					resource.TestCheckResourceAttr(resourceName, "route_map_action", "permit"),                         // checking value updated value of description parameter
-					testAccCheckDCNMServicePolicyIdEqual(resourceName, &servicePolicy_default, &servicePolicy_updated), // this function will check whether id or dn of both resource are same or not to make sure updation is performed on the same resource
+				Config: CreateServiceNodeByAddingParamAndValue(rName, "speed", "25Gb"),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					testAccCheckDCNMServiceNodeExists(resourceName, serviceFabricName, attachedFabricName, "Firewall", rName, &serviceNodeUpdatedId),
+					resource.TestCheckResourceAttr(resourceName, "speed", "25Gb"),
+					testAccCheckDCNMServiceNodeIdEqual(&serviceNodeDefaultId, &serviceNodeUpdatedId),
 				),
 			},
 			{
-				ResourceName:      resourceName,
-				ImportState:       true,
-				ImportStateVerify: true,
-			},
-			{
-				Config: CreateAccServicePolicyUpdatedAttr(rName, ip, "next_hop_action", "drop"), // updating only next_hop_action parameter
-				Check: resource.ComposeTestCheckFunc(
-					testAccCheckDCNMServicePolicyExists(resourceName, &servicePolicy_updated),                          // checking whether resource is exist or not in state file
-					resource.TestCheckResourceAttr(resourceName, "next_hop_action", "drop"),                            // checking value updated value of description parameter
-					testAccCheckDCNMServicePolicyIdEqual(resourceName, &servicePolicy_default, &servicePolicy_updated), // this function will check whether id or dn of both resource are same or not to make sure updation is performed on the same resource
+				Config: CreateServiceNodeByAddingParamAndValue(rName, "speed", "40Gb"),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					testAccCheckDCNMServiceNodeExists(resourceName, serviceFabricName, attachedFabricName, "Firewall", rName, &serviceNodeUpdatedId),
+					resource.TestCheckResourceAttr(resourceName, "speed", "40Gb"),
+					testAccCheckDCNMServiceNodeIdEqual(&serviceNodeDefaultId, &serviceNodeUpdatedId),
 				),
 			},
 			{
-				ResourceName:      resourceName,
-				ImportState:       true,
-				ImportStateVerify: true,
-			},
-			{
-				Config: CreateAccServicePolicyUpdatedAttr(rName, ip, "next_hop_action", "drop-on-fail"), // updating only next_hop_action parameter
-				Check: resource.ComposeTestCheckFunc(
-					testAccCheckDCNMServicePolicyExists(resourceName, &servicePolicy_updated),                          // checking whether resource is exist or not in state file
-					resource.TestCheckResourceAttr(resourceName, "next_hop_action", "drop-on-fail"),                    // checking value updated value of description parameter
-					testAccCheckDCNMServicePolicyIdEqual(resourceName, &servicePolicy_default, &servicePolicy_updated), // this function will check whether id or dn of both resource are same or not to make sure updation is performed on the same resource
+				Config: CreateServiceNodeByAddingParamAndValue(rName, "speed", "50Gb"),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					testAccCheckDCNMServiceNodeExists(resourceName, serviceFabricName, attachedFabricName, "Firewall", rName, &serviceNodeUpdatedId),
+					resource.TestCheckResourceAttr(resourceName, "speed", "50Gb"),
+					testAccCheckDCNMServiceNodeIdEqual(&serviceNodeDefaultId, &serviceNodeUpdatedId),
 				),
 			},
 			{
-				ResourceName:      resourceName,
-				ImportState:       true,
-				ImportStateVerify: true,
-			},
-			{
-				Config: CreateAccServicePolicyUpdatedAttr(rName, ip, "fwd_direction", "false"), // updating only fwd_direction parameter
-				Check: resource.ComposeTestCheckFunc(
-					testAccCheckDCNMServicePolicyExists(resourceName, &servicePolicy_updated),                          // checking whether resource is exist or not in state file
-					resource.TestCheckResourceAttr(resourceName, "fwd_direction", "false"),                             // checking value updated value of description parameter
-					testAccCheckDCNMServicePolicyIdEqual(resourceName, &servicePolicy_default, &servicePolicy_updated), // this function will check whether id or dn of both resource are same or not to make sure updation is performed on the same resource
+				Config: CreateServiceNodeByAddingParamAndValue(rName, "speed", "100Gb"),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					testAccCheckDCNMServiceNodeExists(resourceName, serviceFabricName, attachedFabricName, "Firewall", rName, &serviceNodeUpdatedId),
+					resource.TestCheckResourceAttr(resourceName, "speed", "100Gb"),
+					testAccCheckDCNMServiceNodeIdEqual(&serviceNodeDefaultId, &serviceNodeUpdatedId),
 				),
 			},
 			{
-				ResourceName:      resourceName,
-				ImportState:       true,
-				ImportStateVerify: true,
-			},
-			{
-				Config: CreateAccServicePolicyUpdatedAttr(rName, ip, "deploy", "true"), // updating only deploy parameter
-				Check: resource.ComposeTestCheckFunc(
-					testAccCheckDCNMServicePolicyExists(resourceName, &servicePolicy_updated),                          // checking whether resource is exist or not in state file
-					resource.TestCheckResourceAttr(resourceName, "deploy", "true"),                                     // checking value updated value of description parameter
-					testAccCheckDCNMServicePolicyIdEqual(resourceName, &servicePolicy_default, &servicePolicy_updated), // this function will check whether id or dn of both resource are same or not to make sure updation is performed on the same resource
+				Config: CreateServiceNodeByAddingParamAndValue(rName, "speed", "200Gb"),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					testAccCheckDCNMServiceNodeExists(resourceName, serviceFabricName, attachedFabricName, "Firewall", rName, &serviceNodeUpdatedId),
+					resource.TestCheckResourceAttr(resourceName, "speed", "200Gb"),
+					testAccCheckDCNMServiceNodeIdEqual(&serviceNodeDefaultId, &serviceNodeUpdatedId),
 				),
 			},
 			{
-				ResourceName:      resourceName,
-				ImportState:       true,
-				ImportStateVerify: true,
-			},
-			{
-				Config: CreateAccServicePolicyUpdatedAttr(rName, ip, "deploy_timeout", "10"), // updating only deploy_timeout parameter
-				Check: resource.ComposeTestCheckFunc(
-					testAccCheckDCNMServicePolicyExists(resourceName, &servicePolicy_updated),                          // checking whether resource is exist or not in state file
-					resource.TestCheckResourceAttr(resourceName, "deploy_timeout", "10"),                               // checking value updated value of description parameter
-					testAccCheckDCNMServicePolicyIdEqual(resourceName, &servicePolicy_default, &servicePolicy_updated), // this function will check whether id or dn of both resource are same or not to make sure updation is performed on the same resource
+				Config: CreateServiceNodeByAddingParamAndValue(rName, "speed", "400Gb"),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					testAccCheckDCNMServiceNodeExists(resourceName, serviceFabricName, attachedFabricName, "Firewall", rName, &serviceNodeUpdatedId),
+					resource.TestCheckResourceAttr(resourceName, "speed", "400Gb"),
+					testAccCheckDCNMServiceNodeIdEqual(&serviceNodeDefaultId, &serviceNodeUpdatedId),
 				),
 			},
 			{
-				ResourceName:      resourceName,
-				ImportState:       true,
-				ImportStateVerify: true,
+				Config: CreateServiceNodeByAddingParamAndValue(rName, "allowed_vlans", "1"),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					testAccCheckDCNMServiceNodeExists(resourceName, serviceFabricName, attachedFabricName, "Firewall", rName, &serviceNodeUpdatedId),
+					resource.TestCheckResourceAttr(resourceName, "allowed_vlans", "1"),
+					testAccCheckDCNMServiceNodeIdEqual(&serviceNodeDefaultId, &serviceNodeUpdatedId),
+				),
+			},
+			{
+				Config: CreateServiceNodeByAddingParamAndValue(rName, "allowed_vlans", "200"),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					testAccCheckDCNMServiceNodeExists(resourceName, serviceFabricName, attachedFabricName, "Firewall", rName, &serviceNodeUpdatedId),
+					resource.TestCheckResourceAttr(resourceName, "allowed_vlans", "200"),
+					testAccCheckDCNMServiceNodeIdEqual(&serviceNodeDefaultId, &serviceNodeUpdatedId),
+				),
+			},
+			{
+				Config: CreateServiceNodeByAddingParamAndValue(rName, "allowed_vlans", "500"),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					testAccCheckDCNMServiceNodeExists(resourceName, serviceFabricName, attachedFabricName, "Firewall", rName, &serviceNodeUpdatedId),
+					resource.TestCheckResourceAttr(resourceName, "allowed_vlans", "500"),
+					testAccCheckDCNMServiceNodeIdEqual(&serviceNodeDefaultId, &serviceNodeUpdatedId),
+				),
+			},
+			{
+				Config: CreateServiceNodeByAddingParamAndValue(rName, "allowed_vlans", "2000"),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					testAccCheckDCNMServiceNodeExists(resourceName, serviceFabricName, attachedFabricName, "Firewall", rName, &serviceNodeUpdatedId),
+					resource.TestCheckResourceAttr(resourceName, "allowed_vlans", "2000"),
+					testAccCheckDCNMServiceNodeIdEqual(&serviceNodeDefaultId, &serviceNodeUpdatedId),
+				),
+			},
+			{
+				Config: CreateServiceNodeByAddingParamAndValue(rName, "allowed_vlans", "3000"),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					testAccCheckDCNMServiceNodeExists(resourceName, serviceFabricName, attachedFabricName, "Firewall", rName, &serviceNodeUpdatedId),
+					resource.TestCheckResourceAttr(resourceName, "allowed_vlans", "3000"),
+					testAccCheckDCNMServiceNodeIdEqual(&serviceNodeDefaultId, &serviceNodeUpdatedId),
+				),
+			},
+			{
+				Config: CreateServiceNodeByAddingParamAndValue(rName, "bpdu_guard_flag", "false"),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					testAccCheckDCNMServiceNodeExists(resourceName, serviceFabricName, attachedFabricName, "Firewall", rName, &serviceNodeUpdatedId),
+					resource.TestCheckResourceAttr(resourceName, "bpdu_guard_flag", "false"),
+					testAccCheckDCNMServiceNodeIdEqual(&serviceNodeDefaultId, &serviceNodeUpdatedId),
+				),
 			},
 		},
 	})
 }
 
-/*
-func TestAccApplicationProfile_NegativeCases(t *testing.T) {
-	resourceName := "aci_application_profile.test"
+func TestAccDCNMServiceNode_NegativeCases(t *testing.T) {
 	rName := acctest.RandString(5)
-	longPolicy_template_name := acctest.RandString(129)                                     // creating random string of 129 characters
-	longNameAlias := acctest.RandString(64)                                           // creating random string of 64 characters
-	randomPrio := acctest.RandString(6)                                               // creating random string of 6 characters
-	randomParameter := acctest.RandStringFromCharSet(5, "abcdefghijklmnopqrstuvwxyz") // creating random string of 5 characters (to give as random parameter)
-	randomValue := acctest.RandString(5)                                              // creating random string of 5 characters (to give as random value of random parameter)
-	resource.ParallelTest(t, resource.TestCase{
-		PreCheck:     func() { testAccPreCheck(t) },
-		Providers:    testAccProviders,
-		CheckDestroy: testAccCheckAciApplicationProfileDestroy,
+	randomVal := acctest.RandString(5)
+	longName := acctest.RandString(64)
+	randomParam := acctest.RandStringFromCharSet(5, "abcdefghijklmnopqrstuv")
+	switches := []string{sw1}
+	m := make(map[string]interface{})
+	m["name"] = rName
+	m["node_type"] = "Firewall"
+	m["service_fabric"] = serviceFabricName
+	m["attached_fabric"] = attachedFabricName
+	m["attached_switch_interface_name"] = attachedSwitchInterfaceName
+	m["interface_name"] = interfaceName
+	m["switches"] = switches
+	resource.Test(t, resource.TestCase{
+		PreCheck:          func() { testAccPreCheck(t) },
+		ProviderFactories: testAccProviderFactoriesInternal(&providerServiceNode),
+		CheckDestroy:      testAccCheckDCNMServiceNodeDestroy,
 		Steps: []resource.TestStep{
 			{
-				Config: CreateAccApplicationProfileConfig(rName), // creating application profile with required arguements only
+				Config:      CreateServiceNodeByReplacingValueOfKey(m, "node_type", randomVal, listParams),
+				ExpectError: regexp.MustCompile(`expected node_type to be one of (.)+, got (.)+`),
 			},
 			{
-				ResourceName:      resourceName,
-				ImportState:       true,
-				ImportStateVerify: true,
+				Config:      CreateServiceNodeByAddingParamAndValue(rName, "form_factor", randomVal),
+				ExpectError: regexp.MustCompile(`expected form_factor to be one of (.)+, got (.)+`),
 			},
 			{
-				Config:      CreateAccApplicationProfileWithInValidTenantDn(rName),                       // checking application profile creation with invalid tenant_dn value
-				ExpectError: regexp.MustCompile(`unknown property value (.)+, name dn, class fvAp (.)+`), // test step expect error which should be match with defined regex
+				Config:      CreateServiceNodeByAddingParamAndValue(rName, "bpdu_guard_flag", randomVal),
+				ExpectError: regexp.MustCompile(`expected bpdu_guard_flag to be one of (.)+, got (.)+`),
 			},
 			{
-				Config:      CreateAccApplicationProfileUpdatedAttr(rName, "description", longDescAnnotation), // checking application profile creation with invalid description value
-				ExpectError: regexp.MustCompile(`property descr of (.)+ failed validation for value '(.)+'`),
+				Config:      CreateServiceNodeByAddingParamAndValue(rName, "porttype_fast_enabled", randomVal),
+				ExpectError: regexp.MustCompile(`expected porttype_fast_enabled to be one of (.)+, got (.)+`),
 			},
 			{
-				Config:      CreateAccApplicationProfileUpdatedAttr(rName, "annotation", longDescAnnotation), // checking application profile creation with invalid annotation value
-				ExpectError: regexp.MustCompile(`property annotation of (.)+ failed validation for value '(.)+'`),
+				Config:      CreateServiceNodeByAddingParamAndValue(rName, "admin_state", randomVal),
+				ExpectError: regexp.MustCompile(`expected admin_state to be one of (.)+, got (.)+`),
 			},
 			{
-				Config:      CreateAccApplicationProfileUpdatedAttr(rName, "name_alias", longNameAlias), // checking application profile creation with invalid name_alias value
-				ExpectError: regexp.MustCompile(`property nameAlias of (.)+ failed validation for value '(.)+'`),
-			},
-			{
-				Config:      CreateAccApplicationProfileUpdatedAttr(rName, "prio", randomPrio), // checking application profile creation with invalid prio value
-				ExpectError: regexp.MustCompile(`expected prio to be one of (.)+, got (.)+`),
-			},
-			{
-				Config:      CreateAccApplicationProfileUpdatedAttr(rName, randomParameter, randomValue), // checking application profile creation with randomly created parameter and value
+				Config:      CreateServiceNodeByAddingParamAndValue(rName, randomParam, randomVal),
 				ExpectError: regexp.MustCompile(`An argument named (.)+ is not expected here.`),
 			},
 			{
-				Config: CreateAccApplicationProfileConfig(rName), // creating application profile with required arguements only
+				Config:      CreateServiceNodeByReplacingValueOfKey(m, "name", longName, listParams),
+				ExpectError: regexp.MustCompile(`(.)*(value too long for type VARCHAR)(.)*`),
+			},
+			{
+				Config:      CreateServiceNodeByReplacingValueOfKey(m, "service_fabric", randomVal, listParams),
+				ExpectError: regexp.MustCompile(`(.)*(Cannot find the specified external fabric)(.)*`),
+			},
+			{
+				Config:      CreateServiceNodeByAddingParamAndValue(rName, "speed", randomVal),
+				ExpectError: regexp.MustCompile(`(.)*(Validation failed for following fields:)(.)*`),
+			},
+			{
+				Config:      CreateServiceNodeByAddingParamAndValue(rName, "mtu", randomVal),
+				ExpectError: regexp.MustCompile(`(.)*(Validation failed for following fields:)(.)*`),
+			},
+			{
+				Config:      CreateServiceNodeByAddingParamAndValue(rName, "allowed_vlans", randomVal),
+				ExpectError: regexp.MustCompile(`(.)*(Invalid values found in the 'Trunk Allowed Vlans' field)(.)*`),
+			},
+			{
+				Config:      CreateServiceNodeByReplacingValueOfKey(m, "switches", []string{sw1, sw2, sw3}, listParams),
+				ExpectError: regexp.MustCompile(`(.)*(Upto 2 switches only allowed)`),
+			},
+			{
+				Config: CreateServiceNode([]string{}, m, listParams),
 			},
 		},
 	})
 }
-*/
 
-func testAccCheckDCNMServicePolicyExists(name string, servicePolicy *models.ServicePolicy) resource.TestCheckFunc {
+func testAccCheckDCNMServiceNodeExists(name, serviceFabricName, attachedFabricName, nodeType, rName string, nodeId *string) resource.TestCheckFunc {
 	return func(s *terraform.State) error {
 		rs, ok := s.RootModule().Resources[name]
+
 		if !ok {
-			return fmt.Errorf("ServicePolicy %s not found", name)
-		}
-		if rs.Primary.ID == "" {
-			return fmt.Errorf("No ServicePolicy dn was set")
+			return fmt.Errorf("Service Node %s not found", name)
 		}
 
-		dcnmClient := (*providerServicePolicy).Meta().(*client.Client)
-		cont, err := dcnmClient.GetviaURL(fmt.Sprintf("/appcenter/Cisco/elasticservice/elasticserviceapi/fabrics/testService/servicenodes/SN-1/Firewall/policies/Test_fabric_1/%s", rs.Primary.ID))
-		log.Printf("[DEBUG] before err %s", cont)
-		if err != nil {
-			return err
+		if rs.Primary.ID == "" {
+			return fmt.Errorf("No Service Node id was set")
 		}
-		log.Printf("[DEBUG] after err %s", cont)
-		servicePolicyTest := &models.ServicePolicy{}
-		servicePolicyTest.PolicyName = stripQuotes(cont.S("policyName").String())
-		servicePolicyTest.FabricName = stripQuotes(cont.S("fabricName").String())
-		servicePolicyTest.AttachedFabricName = stripQuotes(cont.S("attachedFabricName").String())
-		servicePolicyTest.ServiceNodeName = stripQuotes(cont.S("serviceNodeName").String())
-		servicePolicyTest.NextHopIp = stripQuotes(cont.S("nextHopIp").String())
-		servicePolicyTest.PeeringName = stripQuotes(cont.S("peeringName").String())
-		servicePolicyTest.DestinationNetwork = stripQuotes(cont.S("destinationNetwork").String())
-		servicePolicyTest.DestinationVrfName = stripQuotes(cont.S("destinationVrfName").String())
-		servicePolicyTest.SourceNetwork = stripQuotes(cont.S("sourceNetwork").String())
-		servicePolicyTest.SourceVrfName = stripQuotes(cont.S("sourceVrfName").String())
-		*servicePolicy = *servicePolicyTest
+
+		*nodeId = rs.Primary.ID
+		expectedServiceNodeId := fmt.Sprintf("%s/%s/%s/%s", serviceFabricName, attachedFabricName, nodeType, rName)
+		if expectedServiceNodeId != rs.Primary.ID {
+			return fmt.Errorf("Service node with id %s doesn't exist", expectedServiceNodeId)
+		}
 		return nil
 	}
 }
 
-func CreateAccServicePolicyConfig(rName, ip string) string {
-	return fmt.Sprintf(`
-	resource "dcnm_service_policy" "first" {
-		policy_name              = "SP-2"
-		service_fabric           = "testService"
-		attached_fabric    		 = "Test_fabric_1"
-		dest_network             = "%s"
-		dest_vrf_name            = "%s"
-		next_hop_ip              = "%s"
-		peering_name             = "%s"
-		service_node_name        = "SN-1"
-		source_network           = "%s"
-		source_vrf_name          = "%s" 
-  }
-  `, rName, rName, ip, rName, rName, rName)
-}
+func testAccCheckDCNMServiceNodeDestroy(s *terraform.State) error {
+	dcnmClient := (*providerServiceNode).Meta().(*client.Client)
 
-func CreateAccServicePolicyWithInavalidIP(rName, ip string) string {
-	fmt.Println("=== STEP  Basic: testing with invalid IP")
-	return fmt.Sprintf(`
-	resource "dcnm_service_policy" "first" {
-		policy_name              = "SP-2"
-		service_fabric           = "testService"
-		attached_fabric    		 = "Test_fabric_1"
-		dest_network             = "%s"
-		dest_vrf_name            = "%s"
-		next_hop_ip              = "%s0"
-		peering_name             = "%s"
-		service_node_name        = "SN-1"
-		source_network           = "%s"
-		source_vrf_name          = "%s" 
-  }
-  `, rName, rName, ip, rName, rName, rName)
-}
-
-func CreateAccServicePolicyConfigUpdatedName(rName, ip, longerName string) string {
-	fmt.Println("=== STEP  Basic: testing servicePolicy creation with invalid name")
-	return fmt.Sprintf(`
-	resource "dcnm_service_policy" "first" {
-		policy_name              = "%s"
-		service_fabric           = "testService"
-		attached_fabric    		 = "Test_fabric_1"
-		dest_network             = "%s"
-		dest_vrf_name            = "%s"
-		next_hop_ip              = "%s"
-		peering_name             = "%s"
-		service_node_name        = "SN-1"
-		source_network           = "%s"
-		source_vrf_name          = "%s" 
-  }
-  `, longerName, rName, rName, ip, rName, rName, rName)
-}
-
-func CreateAccServicePolicyWithPolicyIPConfig(rName, rOtherName, ip string) string {
-	return fmt.Sprintf(`
-	resource "dcnm_service_policy" "first" {
-		policy_name              = "%s"
-		service_fabric           = "testService"
-		attached_fabric    		 = "Test_fabric_1"
-		dest_network             = "%s"
-		dest_vrf_name            = "%s"
-		next_hop_ip              = "%s"
-		peering_name             = "%s"
-		service_node_name        = "SN-1"
-		source_network           = "%s"
-		source_vrf_name          = "%s" 
-  }
-  `, rOtherName, rName, rName, ip, rName, rName, rName)
-}
-
-func CreateAccServicePolicyWithServicefabricIPConfig(rName, rOtherName, ip string) string {
-	return fmt.Sprintf(`
-	resource "dcnm_service_policy" "first" {
-		policy_name              = "SP-2"
-		service_fabric           = "%s"
-		attached_fabric    		 = "Test_fabric_1"
-		dest_network             = "%s"
-		dest_vrf_name            = "%s"
-		next_hop_ip              = "%s"
-		peering_name             = "%s"
-		service_node_name        = "SN-1"
-		source_network           = "%s"
-		source_vrf_name          = "%s" 
-  }
-  `, rOtherName, rName, rName, ip, rName, rName, rName)
-}
-
-func CreateAccServicePolicyWithAttachedfabricIPConfig(rName, rOtherName, ip string) string {
-	return fmt.Sprintf(`
-	resource "dcnm_service_policy" "first" {
-		policy_name              = "SP-2"
-		service_fabric           = "testService"
-		attached_fabric    		 = "%s"
-		dest_network             = "%s"
-		dest_vrf_name            = "%s"
-		next_hop_ip              = "%s"
-		peering_name             = "%s"
-		service_node_name        = "SN-1"
-		source_network           = "%s"
-		source_vrf_name          = "%s" 
-  }
-  `, rOtherName, rName, rName, ip, rName, rName, rName)
-}
-
-func CreateAccServicePolicyWithDestnetworkIPConfig(rName, rOtherName, ip string) string {
-	return fmt.Sprintf(`
-	resource "dcnm_service_policy" "first" {
-		policy_name              = "SP-2"
-		service_fabric           = "testService"
-		attached_fabric    		 = "Test_fabric_1"
-		dest_network             = "%s"
-		dest_vrf_name            = "%s"
-		next_hop_ip              = "%s"
-		peering_name             = "%s"
-		service_node_name        = "SN-1"
-		source_network           = "%s"
-		source_vrf_name          = "%s" 
-  }
-  `, rOtherName, rName, ip, rName, rName, rName)
-}
-
-func CreateAccServicePolicyWithDest_vrf_nameIPConfig(rName, rOtherName, ip string) string {
-	return fmt.Sprintf(`
-	resource "dcnm_service_policy" "first" {
-		policy_name              = "SP-2"
-		service_fabric           = "testService"
-		attached_fabric    		 = "Test_fabric_1"
-		dest_network             = "%s"
-		dest_vrf_name            = "%s"
-		next_hop_ip              = "%s"
-		peering_name             = "%s"
-		service_node_name        = "SN-1"
-		source_network           = "%s"
-		source_vrf_name          = "%s" 
-  }
-  `, rName, rOtherName, ip, rName, rName, rName)
-}
-
-func CreateAccServicePolicyWithPeeringnameIPConfig(rName, rOtherName, ip string) string {
-	return fmt.Sprintf(`
-	resource "dcnm_service_policy" "first" {
-		policy_name              = "SP-2"
-		service_fabric           = "testService"
-		attached_fabric    		 = "Test_fabric_1"
-		dest_network             = "%s"
-		dest_vrf_name            = "%s"
-		next_hop_ip              = "%s"
-		peering_name             = "%s"
-		service_node_name        = "SN-1"
-		source_network           = "%s"
-		source_vrf_name          = "%s" 
-  }
-  `, rName, rName, ip, rOtherName, rName, rName)
-}
-
-func CreateAccServicePolicyWithServicenodenameIPConfig(rName, rOtherName, ip string) string {
-	return fmt.Sprintf(`
-	resource "dcnm_service_policy" "first" {
-		policy_name              = "SP-2"
-		service_fabric           = "testService"
-		attached_fabric    		 = "Test_fabric_1"
-		dest_network             = "%s"
-		dest_vrf_name            = "%s"
-		next_hop_ip              = "%s"
-		peering_name             = "%s"
-		service_node_name        = "%s"
-		source_network           = "%s"
-		source_vrf_name          = "%s" 
-  }
-  `, rName, rName, ip, rName, rOtherName, rName, rName)
-}
-
-func CreateAccServicePolicyWithSource_networkIPConfig(rName, rOtherName, ip string) string {
-	return fmt.Sprintf(`
-	resource "dcnm_service_policy" "first" {
-		policy_name              = "SP-2"
-		service_fabric           = "testService"
-		attached_fabric    		 = "Test_fabric_1"
-		dest_network             = "%s"
-		dest_vrf_name            = "%s"
-		next_hop_ip              = "%s"
-		peering_name             = "%s"
-		service_node_name        = "SN-1"
-		source_network           = "%s"
-		source_vrf_name          = "%s" 
-  }
-  `, rName, rName, ip, rName, rOtherName, rName)
-}
-
-func CreateAccServicePolicyWithSource_vrf_nameIPConfig(rName, rOtherName, ip string) string {
-	return fmt.Sprintf(`
-	resource "dcnm_service_policy" "first" {
-		policy_name              = "SP-2"
-		service_fabric           = "testService"
-		attached_fabric    		 = "Test_fabric_1"
-		dest_network             = "%s"
-		dest_vrf_name            = "%s"
-		next_hop_ip              = "%s"
-		peering_name             = "%s"
-		service_node_name        = "SN-1"
-		source_network           = "%s"
-		source_vrf_name          = "%s" 
-  }
-  `, rName, rName, ip, rName, rName, rOtherName)
-}
-
-func CreateAccServicePolicyConfigWithOptionalValues(rName, ip string) string {
-	fmt.Println("=== STEP  Basic: testing servicePolicy creation with optional parameters")
-	return fmt.Sprintf(`
-	resource "dcnm_service_policy" "first" {
-		policy_name              = "SP-2"
-		service_fabric           = "testService"
-		attached_fabric    		 = "Test_fabric_1"
-		dest_network             = "%s"
-		dest_vrf_name            = "%s"
-		next_hop_ip              = "%s"
-		peering_name             = "%s"
-		service_node_name        = "SN-1"
-		source_network           = "%s"
-		source_vrf_name          = "%s"
-		
-		policy_template_name 	 = "service_template"
-		reverse_enabled 	 	 = true
-		protocol			 	 = "tcp"
-		src_port			 	 = "3200"
-		dest_port			 	 = "3300"
-		route_map_action	 	 = "deny"
-		next_hop_action	 	 	 = "drop"
-		fwd_direction		 	 = false
-		deploy				 	 = false
-		deploy_timeout		 	 = 200
-  }
-  `, rName, rName, ip, rName, rName, rName)
-}
-
-func testAccCheckDCNMPolicyDestroy(s *terraform.State) error {
-	dcnmClient := (*providerServicePolicy).Meta().(*client.Client)
 	for _, rs := range s.RootModule().Resources {
-		if rs.Type == "dcnm_policy" {
-			_, err := dcnmClient.GetviaURL(fmt.Sprintf("/rest/control/policies/%s", "test-demo-1"))
+		if rs.Type == "dcnm_service_node" {
+			primaryIdArr := strings.Split(rs.Primary.ID, "/")
+			serviceNodeId := primaryIdArr[3]
+			_, err := dcnmClient.GetviaURL(fmt.Sprintf("/appcenter/cisco/ndfc/api/v1/elastic-service/fabrics/%s/service-nodes/%s", serviceFabricName, serviceNodeId))
 			if err == nil {
-				return fmt.Errorf("Policy still exists!!")
+				return fmt.Errorf("Service Node still exists")
 			}
 		}
 	}
@@ -820,259 +447,106 @@ func testAccCheckDCNMPolicyDestroy(s *terraform.State) error {
 	return nil
 }
 
-func testAccCheckDCNMServicePolicyIdEqual(name string, sp1, sp2 *models.ServicePolicy) resource.TestCheckFunc {
-	return func(s *terraform.State) error {
-		rs1, ok := s.RootModule().Resources[name]
-		if !ok {
-			return fmt.Errorf("ServicePolicy %s not found", name)
+func CreateServiceNode(excludeParams []string, m map[string]interface{}, listParams []string) string {
+	if len(excludeParams) > 0 {
+		fmt.Printf("=== STEP  testing Service Node creation without %v\n", excludeParams)
+	} else {
+		fmt.Println("=== STEP  creating Service Node with all required parameters")
+	}
+	res := "resource \"dcnm_service_node\" \"test\"{ \n"
+	for k, v := range m {
+		exclude := false
+		list := false
+		for _, excludeParam := range excludeParams {
+			if k == excludeParam {
+				exclude = true
+			}
 		}
-		if rs1.Primary.ID == "" {
-			return fmt.Errorf("No ServicePolicy dn was set")
+		for _, listParam := range listParams {
+			if k == listParam {
+				list = true
+			}
 		}
-		rs2, ok := s.RootModule().Resources[name]
-		if !ok {
-			return fmt.Errorf("ServicePolicy %s not found", name)
+		if !exclude && list {
+			valList := v.([]string)
+			valListArr := convertToQuotedStringArray(valList)
+			res = res + string(k) + "=" + valListArr + "\n"
+		} else if !exclude {
+			res = res + string(k) + "=" + QuotedString(v.(string)) + "\n"
 		}
-		if rs2.Primary.ID == "" {
-			return fmt.Errorf("No ServicePolicy dn was set")
-		}
+	}
+	res = res + "}"
+	return res
+}
 
-		if rs1.Primary.ID != rs2.Primary.ID {
-			return fmt.Errorf("ServicePolicy ids are not equal")
+func CreateServiceNodeByReplacingValueOfKey(m map[string]interface{}, key string, value interface{}, listParams []string) string {
+	fmt.Printf("=== STEP  testing by updating value of parameter %s with %v\n", key, value)
+	res := "resource \"dcnm_service_node\" \"test\"{ \n"
+	for k, v := range m {
+		list := false
+		for _, listParam := range listParams {
+			if k == listParam {
+				list = true
+			}
+		}
+		if k == key {
+			v = value
+		}
+		if list {
+			valList := v.([]string)
+			valListArr := convertToQuotedStringArray(valList)
+			res = res + string(k) + "=" + valListArr + "\n"
+		} else {
+			res = res + string(k) + "=" + QuotedString(v.(string)) + "\n"
+		}
+	}
+	res = res + "}"
+	return res
+}
+
+func CreateServiceNodeByAddingParamAndValue(rName, key, value string) string {
+
+	fmt.Printf("=== STEP  testing Service Node creation with %s : %s\n", key, value)
+
+	res := fmt.Sprintf(`
+	resource "dcnm_service_node" "test" {
+		name                           = "%s"
+		node_type                      = "%s"
+		service_fabric                 = "%s"
+		attached_fabric                = "%s"
+		attached_switch_interface_name = "%s"
+		interface_name                 = "%s"
+		switches                       = %s
+		%s						   = "%s"
+	  }
+	`, rName, nodeTypeDefault, serviceFabricName, attachedFabricName, attachedSwitchInterfaceName, interfaceName, convertToQuotedStringArray([]string{sw1}), key, value)
+	return res
+}
+
+func testAccCheckDCNMServiceNodeIdEqual(id1, id2 *string) resource.TestCheckFunc {
+	return func(s *terraform.State) error {
+		if *id1 != *id2 {
+			return fmt.Errorf("Ids of service nodes are different")
 		}
 		return nil
 	}
 }
 
-func testAccCheckDCNMServicePolicyIdNotEqual(name string, sp1, sp2 *models.ServicePolicy) resource.TestCheckFunc {
+func testAccCheckDCNMServiceNodeIdNotEqual(id1, id2 *string) resource.TestCheckFunc {
 	return func(s *terraform.State) error {
-		rs1, ok := s.RootModule().Resources[name]
-		if !ok {
-			return fmt.Errorf("ServicePolicy %s not found", name)
-		}
-		if rs1.Primary.ID == "" {
-			return fmt.Errorf("No ServicePolicy dn was set")
-		}
-		rs2, ok := s.RootModule().Resources[name]
-		if !ok {
-			return fmt.Errorf("ServicePolicy %s not found", name)
-		}
-		if rs2.Primary.ID == "" {
-			return fmt.Errorf("No ServicePolicy dn was set")
-		}
-
-		if rs1.Primary.ID == rs2.Primary.ID {
-			return fmt.Errorf("ServicePolicy id are equal")
+		if *id1 == *id2 {
+			return fmt.Errorf("Ids of service nodes are equal")
 		}
 		return nil
 	}
 }
 
-func CreateAccServicePolicyWithoutPolicy_name(rName, ip string) string {
-	fmt.Println("=== STEP  Basic: testing ServicePolicy creation without giving policy_name")
-	resource := fmt.Sprintf(`
-	resource "dcnm_service_policy" "first" {
-  		service_fabric           = "%s"
-  		attached_fabric    		 = "%s"
-  		dest_network             = "%s"
-  		dest_vrf_name            = "%s"
-  		next_hop_ip              = "%s"
-  		peering_name             = "%s"
-  		service_node_name        = "%s"
-  		source_network           = "%s"
-  		source_vrf_name          = "%s"
+func testServiceNodeImportStateIdFunc(resourceName string) resource.ImportStateIdFunc {
+	return func(s *terraform.State) (string, error) {
+		rs, ok := s.RootModule().Resources[resourceName]
+		if !ok {
+			return "", fmt.Errorf("Not found %s", resourceName)
+		}
+		return fmt.Sprintf("%s:%s", rs.Primary.Attributes["service_fabric"], rs.Primary.Attributes["name"]), nil
 	}
-	`, rName, rName, rName, rName, ip, rName, rName, rName, rName)
-	return resource
-}
-
-func CreateAccServicePolicyWithoutService_fabric(rName, ip string) string {
-	fmt.Println("=== STEP  Basic: testing ServicePolicy creation without giving service_fabric")
-	resource := fmt.Sprintf(`
-	resource "dcnm_service_policy" "first" {
-		policy_name              = "%s"
-  		attached_fabric    		 = "%s"
-  		dest_network             = "%s"
-  		dest_vrf_name            = "%s"
-  		next_hop_ip              = "%s"
-  		peering_name             = "%s"
-  		service_node_name        = "%s"
-  		source_network           = "%s"
-  		source_vrf_name          = "%s"
-	}
-	`, rName, rName, rName, rName, ip, rName, rName, rName, rName)
-	return resource
-}
-
-func CreateAccServicePolicyWithoutAttached_fabric(rName, ip string) string {
-	fmt.Println("=== STEP  Basic: testing ServicePolicy creation without giving attached_fabric")
-	resource := fmt.Sprintf(`
-	resource "dcnm_service_policy" "first" {
-		policy_name              = "%s"
-  		service_fabric           = "%s"
-  		dest_network             = "%s"
-  		dest_vrf_name            = "%s"
-  		next_hop_ip              = "%s"
-  		peering_name             = "%s"
-  		service_node_name        = "%s"
-  		source_network           = "%s"
-  		source_vrf_name          = "%s"
-	}
-	`, rName, rName, rName, rName, ip, rName, rName, rName, rName)
-	return resource
-}
-
-func CreateAccServicePolicyWithoutDest_network(rName, ip string) string {
-	fmt.Println("=== STEP  Basic: testing ServicePolicy creation without giving dest_network")
-	resource := fmt.Sprintf(`
-	resource "dcnm_service_policy" "first" {
-		policy_name              = "%s"
-  		service_fabric           = "%s"
-  		attached_fabric    		 = "%s"
-  		dest_vrf_name            = "%s"
-  		next_hop_ip              = "%s"
-  		peering_name             = "%s"
-  		service_node_name        = "%s"
-  		source_network           = "%s"
-  		source_vrf_name          = "%s"
-	}
-	`, rName, rName, rName, rName, ip, rName, rName, rName, rName)
-	return resource
-}
-
-func CreateAccServicePolicyWithoutDest_vrf_name(rName, ip string) string {
-	fmt.Println("=== STEP  Basic: testing ServicePolicy creation without giving dest_vrf_name")
-	resource := fmt.Sprintf(`
-	resource "dcnm_service_policy" "first" {
-		policy_name              = "%s"
-  		service_fabric           = "%s"
-  		attached_fabric    		 = "%s"
-  		dest_network             = "%s"
-  		next_hop_ip              = "%s"
-  		peering_name             = "%s"
-  		service_node_name        = "%s"
-  		source_network           = "%s"
-  		source_vrf_name          = "%s"
-	}
-	`, rName, rName, rName, rName, ip, rName, rName, rName, rName)
-	return resource
-}
-
-func CreateAccServicePolicyWithoutNext_hop_ip(rName string) string {
-	fmt.Println("=== STEP  Basic: testing ServicePolicy creation without giving next_hop_ip")
-	resource := fmt.Sprintf(`
-	resource "dcnm_service_policy" "first" {
-		policy_name              = "%s"
-  		service_fabric           = "%s"
-  		attached_fabric    		 = "%s"
-  		dest_network             = "%s"
-  		dest_vrf_name            = "%s"
-  		peering_name             = "%s"
-  		service_node_name        = "%s"
-  		source_network           = "%s"
-  		source_vrf_name          = "%s"
-	}
-	`, rName, rName, rName, rName, rName, rName, rName, rName, rName)
-	return resource
-}
-
-func CreateAccServicePolicyWithoutPeering_name(rName, ip string) string {
-	fmt.Println("=== STEP  Basic: testing ServicePolicy creation without giving peering_name")
-	resource := fmt.Sprintf(`
-	resource "dcnm_service_policy" "first" {
-		policy_name              = "%s"
-  		service_fabric           = "%s"
-  		attached_fabric    		 = "%s"
-  		dest_network             = "%s"
-  		dest_vrf_name            = "%s"
-  		next_hop_ip              = "%s"
-  		service_node_name        = "%s"
-  		source_network           = "%s"
-  		source_vrf_name          = "%s"
-	}
-	`, rName, rName, rName, rName, rName, ip, rName, rName, rName)
-	return resource
-}
-
-func CreateAccServicePolicyWithoutService_node_name(rName, ip string) string {
-	fmt.Println("=== STEP  Basic: testing ServicePolicy creation without giving service_node_name")
-	resource := fmt.Sprintf(`
-	resource "dcnm_service_policy" "first" {
-		policy_name              = "%s"
-  		service_fabric           = "%s"
-  		attached_fabric    		 = "%s"
-  		dest_network             = "%s"
-  		dest_vrf_name            = "%s"
-  		next_hop_ip              = "%s"
-  		peering_name             = "%s"
-  		source_network           = "%s"
-  		source_vrf_name          = "%s"
-	}
-	`, rName, rName, rName, rName, rName, ip, rName, rName, rName)
-	return resource
-}
-
-func CreateAccServicePolicyWithoutSource_network(rName, ip string) string {
-	fmt.Println("=== STEP  Basic: testing ServicePolicy creation without giving source_network")
-	resource := fmt.Sprintf(`
-	resource "dcnm_service_policy" "first" {
-		policy_name              = "%s"
-  		service_fabric           = "%s"
-  		attached_fabric    		 = "%s"
-  		dest_network             = "%s"
-  		dest_vrf_name            = "%s"
-  		next_hop_ip              = "%s"
-  		peering_name             = "%s"
-  		service_node_name        = "%s"
-  		source_vrf_name          = "%s"
-	}
-	`, rName, rName, rName, rName, rName, ip, rName, rName, rName)
-	return resource
-}
-
-func CreateAccServicePolicyWithoutSource_vrf_name(rName, ip string) string {
-	fmt.Println("=== STEP  Basic: testing ServicePolicy creation without giving source_vrf_name")
-	resource := fmt.Sprintf(`
-	resource "dcnm_service_policy" "first" {
-		policy_name              = "%s"
-  		service_fabric           = "%s"
-  		attached_fabric    		 = "%s"
-  		dest_network             = "%s"
-  		dest_vrf_name            = "%s"
-  		next_hop_ip              = "%s"
-  		peering_name             = "%s"
-  		service_node_name        = "%s"
-  		source_network           = "%s"
-	}
-	`, rName, rName, rName, rName, rName, ip, rName, rName, rName)
-	return resource
-}
-
-func CreateAccServicePolicyUpdatedAttr(rName, ip, attribute, value string) string {
-	fmt.Printf("=== STEP  testing attribute: %s=%s \n", attribute, value)
-	return fmt.Sprintf(`
-	resource "dcnm_service_policy" "first" {
-		policy_name              = "SP-2"
-		service_fabric           = "testService"
-		attached_fabric    		 = "Test_fabric_1"
-		dest_network             = "%s"
-		dest_vrf_name            = "%s"
-		next_hop_ip              = "%s"
-		peering_name             = "%s"
-		service_node_name        = "SN-1"
-		source_network           = "%s"
-		source_vrf_name          = "%s"
-		
-		%s 	 = "%s"
-		reverse_enabled 	 	 = true
-		protocol			 	 = "tcp"
-		src_port			 	 = "3200"
-		dest_port			 	 = "3300"
-		route_map_action	 	 = "deny"
-		next_hop_action	 	 	 = "drop"
-		fwd_direction		 	 = false
-		deploy				 	 = false
-		deploy_timeout		 	 = 200
-  }
-  `, rName, rName, ip, rName, rName, rName, attribute, value)
 }
