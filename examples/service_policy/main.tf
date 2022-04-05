@@ -1,12 +1,32 @@
-resource "dcnm_service_policy" "example" {
-  policy_name       = "SP-2"
-  service_fabric    = "edge"
-  attached_fabric   = "terraform"
-  dest_network      = "n1"
-  dest_vrf_name     = "check1"
-  next_hop_ip       = "10.10.10.2"
-  peering_name      = "p1"
-  service_node_name = "SN-2"
-  source_network    = "n2"
-  source_vrf_name   = "check1"
+terraform {
+  required_providers {
+    dcnm = {
+      source = "CiscoDevNet/dcnm"
+    }
+  }
+}
+
+provider "dcnm" {
+  # Cisco DCNM/NDFC user name
+  username = "{{enter_username}}"
+  # Cisco DCNM/NDFC password
+  password = "{{enter_password}}"
+  # Cisco DCNM/NDFC url
+  url      = "{{enter_url_of_dcnm_or_ndfc}}"
+  insecure = true
+  # Used to select DCNM or NDFC for authentication purposes
+  #nd for NDFC and dcnm for DCNM
+  platform = "nd"
+}
+
+resource "dcnm_policy" "dcnm_policy" {
+  serial_number = "{{enter_switch_serial_number}}"
+  template_name = "aaa_radius_deadtime"   #Enter Template Name
+  template_props = {
+    "DTIME" : "3"
+    "AAA_GROUP" : "management"
+  }
+  priority    = 500
+  description = "This is demo policy."
+
 }

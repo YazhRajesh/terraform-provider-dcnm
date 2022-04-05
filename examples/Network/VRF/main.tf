@@ -7,22 +7,25 @@ terraform {
 }
 
 provider "dcnm" {
-  username = ""
-  password = ""
-  url      = ""
-  # expiry   = 900000
+  # Cisco DCNM/NDFC user name
+  username = "{{enter_username}}"
+  # Cisco DCNM/NDFC password
+  password = "{{enter_password}}"
+  # Cisco DCNM/NDFC url
+  url      = "{{enter_url_of_dcnm_or_ndfc}}"
+  insecure = true
+  # Used to select DCNM or NDFC for authentication purposes
+  #nd for NDFC and dcnm for DCNM
+  platform = "nd"
 }
 
-data "dcnm_inventory" "inv" {
-  fabric_name = "example"
-  switch_name = "example"
-}
 
-resource "dcnm_vrf" "first" {
-  fabric_name             = "fab2"
-  name                    = "check"
+resource "dcnm_vrf" "vrf" {
+  fabric_name             = "{{enter_fabric_name}}"
+  name                    = "{{enter_vrf_name}}"
   vlan_id                 = 2002
-  vlan_name               = "check"
+  segment_id              = "50016"
+  vlan_name               = "{{enter_vlan_name}}"
   description             = "vrf creation"
   intf_description        = "vrf"
   tag                     = "1250"
@@ -30,7 +33,7 @@ resource "dcnm_vrf" "first" {
   max_ibgp_path           = 4
   trm_enable              = false
   rp_external_flag        = false
-  rp_address              = "1.2.3.4"
+  rp_address              = "1.1.1.2"
   loopback_id             = 15
   mutlicast_address       = "10.0.0.2"
   mutlicast_group         = "224.0.0.1/4"
@@ -41,10 +44,10 @@ resource "dcnm_vrf" "first" {
   static_default_route    = false
   deploy                  = true
   attachments {
-    serial_number = data.dcnm_inventory.inv.serial_number
+    serial_number = "{{enter_switch_serial_number}}"
     vlan_id       = 2300
     attach        = true
     loopback_id   = 70
-    loopback_ipv4 = "1.2.3.4"
+    loopback_ipv4 = "1.1.1.3"
   }
 }

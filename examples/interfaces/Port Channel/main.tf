@@ -19,16 +19,17 @@ provider "dcnm" {
   platform = "nd"
 }
 
-resource "dcnm_interface" "EthernetTerraform" {
-  policy        = "int_trunk_host_11_1"
-  type          = "ethernet"
-  name          = "Ethernet1/14"
-  fabric_name   = var.fabric      # Enter fabric_name
-  switch_name_1 = "93216TC-FX2-L1-S3"
+resource "dcnm_interface" "PortChannelTerraform" {
+  policy        = "int_port_channel_access_host_11_1"
+  type          = "port-channel"
+  name          = "Po300"
+  fabric_name   = "var.fabric"    #Enter fabric name
+  switch_name_1 = var.switch_name #Enter Switch_Name
 
-  ethernet_speed  = "Auto"
-  bpdu_guard_flag = "no"
-  allowed_vlans   = "none"
+  mode            = "active"
+  bpdu_guard_flag = "true"
   mtu             = "jumbo"
-  port_fast_flag  = true
+  allowed_vlans   = "none"
+  access_vlans    = "10"
+  pc_interface    = ["eth1/10", "eth1/12"]
 }
